@@ -78,8 +78,11 @@ def comando():
         descricao = lookahead.value
         match('STRING')
         match('FIM')
-        tarefas[nome] = {'descricao': descricao, 'status': 'pendente'}
-        print(f"Tarefa '{nome}' criada: '{descricao}'")
+        if nome in tarefas:
+            print(f"Erro: Já existe uma tarefa com o nome '{nome}'.")
+        else:
+            tarefas[nome] = {'descricao': descricao, 'status': 'pendente'}
+            print(f"Tarefa '{nome}' criada: '{descricao}'")
 
     elif lookahead.type == 'REMOVER':
         match('REMOVER')
