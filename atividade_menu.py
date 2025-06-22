@@ -1,6 +1,8 @@
 import sys
 import ply.lex as lex
 
+# --- Definição do Lexer ---
+
 reservadas = {
     'criar_tarefa': 'CRIAR',
     'remover_tarefa': 'REMOVER',
@@ -20,7 +22,7 @@ t_FIM = r';'
 t_ignore = ' \t'
 
 def t_STRING(t):
-    r'"[^\"]+"'
+    r'"[^"]+"'
     t.value = t.value.strip('"')
     return t
 
@@ -34,10 +36,13 @@ def t_newline(t):
     t.lexer.lineno += len(t.value)
 
 def t_error(t):
-    print(f"Caractere inválido: {t.value[0]} na linha {t.lexer.lineno}")
+    print(f"Caractere inválido: '{t.value[0]}' na linha {t.lexer.lineno}")
     t.lexer.skip(1)
+    sys.exit(1)
 
 lexer = lex.lex()
+
+# --- Analisador / Interpretador ---
 
 tarefas = {}
 lookahead = None
@@ -47,8 +52,18 @@ def match(tipo):
     if lookahead and lookahead.type == tipo:
         lookahead = lexer.token()
     else:
-        erro = lookahead.value if lookahead else 'EOF'
-        print(f"Erro sintático. Esperado: {tipo}, encontrado: {erro}")
+        erro = lookahead.value if lookahead else 'EOF (Fim da Entrada)'
+        print(f"Erro sintático. Esperado: '{tipo}', encontrado: '{erro}'")
+        sys.exit(1)
+
+def obter_nome_tarefa():
+    global lookahead
+    if lookahead.type in ('IDENTIFICADOR', 'STRING'):
+        nome = lookahead.value
+        match(lookahead.type)
+        return nome
+    else:
+        print(f"Erro: Nome de tarefa inválido: '{lookahead.value}'")
         sys.exit(1)
 
 def comando():
@@ -58,30 +73,27 @@ def comando():
 
     if lookahead.type == 'CRIAR':
         match('CRIAR')
-        nome = lookahead.value
-        match('IDENTIFICADOR')
+        nome = obter_nome_tarefa()
         match('ATRIBUICAO')
         descricao = lookahead.value
         match('STRING')
         match('FIM')
         tarefas[nome] = {'descricao': descricao, 'status': 'pendente'}
-        print(f"Tarefa '{nome}' criada: {descricao}")
+        print(f"Tarefa '{nome}' criada: '{descricao}'")
 
     elif lookahead.type == 'REMOVER':
         match('REMOVER')
-        nome = lookahead.value
-        match('IDENTIFICADOR')
+        nome = obter_nome_tarefa()
         match('FIM')
         if nome in tarefas:
             del tarefas[nome]
             print(f"Tarefa '{nome}' removida")
         else:
-            print(f"Tarefa '{nome}' não encontrada")
+            print(f"Erro: Tarefa '{nome}' não encontrada para remoção.")
 
     elif lookahead.type == 'STATUS':
         match('STATUS')
-        nome = lookahead.value
-        match('IDENTIFICADOR')
+        nome = obter_nome_tarefa()
         match('ATRIBUICAO')
         novo_status = lookahead.value
         match('STRING')
@@ -90,56 +102,58 @@ def comando():
             tarefas[nome]['status'] = novo_status
             print(f"Status da tarefa '{nome}' alterado para '{novo_status}'")
         else:
-            print(f"Tarefa '{nome}' não encontrada")
+            print(f"Erro: Tarefa '{nome}' não encontrada para alterar status.")
 
     elif lookahead.type == 'MOSTRAR':
         match('MOSTRAR')
-        nome = lookahead.value
-        match('IDENTIFICADOR')
+        nome = obter_nome_tarefa()
         match('FIM')
         if nome in tarefas:
             t = tarefas[nome]
             print(f"{nome}: {t['descricao']} (Status: {t['status']})")
         else:
-            print(f"Tarefa '{nome}' não encontrada")
+            print(f"Erro: Tarefa '{nome}' não encontrada para mostrar.")
     else:
         print(f"Erro sintático: Comando inesperado ou token inválido '{lookahead.value}' (Tipo: {lookahead.type})")
         sys.exit(1)
 
-def programa():
+def programa(comando_string):
     global lookahead
+    lexer.input(comando_string)
     lookahead = lexer.token()
     comando()
 
+# --- Interface do Usuário ---
 
 def menu():
     while True:
-        print("\nGerenciador de Tarefas")
+        print("\n--- Gerenciador de Tarefas ---")
         print("1. Criar tarefa")
         print("2. Remover tarefa")
         print("3. Alterar status de tarefa")
         print("4. Mostrar tarefa")
         print("5. Sair")
 
-        opcao = input("Escolha uma opção: ")
+        opcao = input("Escolha uma opção: ").strip()
+        comando_str = ""
 
         if opcao == '1':
-            nome = input("Nome da tarefa: ")
-            descricao = input("Descrição: ")
-            comando_str = f'criar_tarefa {nome} = "{descricao}";'
+            nome = input("Nome da tarefa: ").strip()
+            descricao = input("Descrição: ").strip()
+            comando_str = f'criar_tarefa "{nome}" = "{descricao}";'
 
         elif opcao == '2':
-            nome = input("Nome da tarefa para remover: ")
-            comando_str = f'remover_tarefa {nome};'
+            nome = input("Nome da tarefa para remover: ").strip()
+            comando_str = f'remover_tarefa "{nome}";'
 
         elif opcao == '3':
-            nome = input("Nome da tarefa: ")
-            status = input("Novo status: ")
-            comando_str = f'alterar_status {nome} = "{status}";'
+            nome = input("Nome da tarefa: ").strip()
+            status = input("Novo status: ").strip()
+            comando_str = f'alterar_status "{nome}" = "{status}";'
 
         elif opcao == '4':
-            nome = input("Nome da tarefa: ")
-            comando_str = f'mostrar_tarefa {nome};'
+            nome = input("Nome da tarefa: ").strip()
+            comando_str = f'mostrar_tarefa "{nome}";'
 
         elif opcao == '5':
             print("Saindo do gerenciador. Até logo!")
@@ -150,10 +164,16 @@ def menu():
             continue
 
         try:
-            lexer.input(comando_str)
-            programa()
+            programa(comando_str)
+        except SystemExit:
+            print("Ocorreu um erro de sintaxe ou caractere inválido. Por favor, tente novamente.")
+            global lexer, lookahead
+            lexer = lex.lex()
+            lookahead = None
+            continue
         except Exception as e:
-            print(f"Erro ao processar comando: {e}")
+            print(f"Ocorreu um erro inesperado: {e}")
 
-
-menu()
+# Executa o menu
+if __name__ == "__main__":
+    menu()
