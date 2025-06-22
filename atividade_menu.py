@@ -102,8 +102,12 @@ def comando():
         match('STRING')
         match('FIM')
         if nome in tarefas:
-            tarefas[nome]['status'] = novo_status
-            print(f"Status da tarefa '{nome}' alterado para '{novo_status}'")
+            status_validos = ['pendente', 'em andamento', 'finalizado']
+            if novo_status not in status_validos:
+                print(f"Erro: Status inválido. Use um dos seguintes: {', '.join(status_validos)}")
+            else:
+                tarefas[nome]['status'] = novo_status
+                print(f"Status da tarefa '{nome}' alterado para '{novo_status}'")
         else:
             print(f"Erro: Tarefa '{nome}' não encontrada para alterar status.")
 
@@ -151,7 +155,16 @@ def menu():
 
         elif opcao == '3':
             nome = input("Nome da tarefa: ").strip()
-            status = input("Novo status: ").strip()
+            print("Escolha o novo status:")
+            print("1. pendente")
+            print("2. em andamento")
+            print("3. finalizado")
+            op_status = input("Opção de status: ").strip()
+            status_opcoes = {'1': 'pendente', '2': 'em andamento', '3': 'finalizado'}
+            status = status_opcoes.get(op_status)
+            if not status:
+                print("Status inválido. Tente novamente.")
+                continue
             comando_str = f'alterar_status "{nome}" = "{status}";'
 
         elif opcao == '4':
